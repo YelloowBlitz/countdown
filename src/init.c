@@ -343,9 +343,35 @@ HIDDEN void start_cntd()
 		mosq = mosquitto_new(client_id,
 							 true	  ,
 							 0);
-		mosquitto_username_pw_set(mosq,
-								  "your_username",
-								  "your_password");
+        
+		int err = mosquitto_username_pw_set(mosq,
+								  "hpe",
+								  "m0squ1tt0321");
+
+        if (err != MOSQ_ERR_SUCCESS)
+        {
+            int world_rank;
+            char hostname[STRING_SIZE];
+            char error[STRING_SIZE] = "\0";
+
+            gethostname(hostname, sizeof(hostname));
+            PMPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+            if (err == MOSQ_ERR_INVAL)
+            {
+                strcpy(error, "Invalid parameters");
+            }
+            else if (err == MOSQ_ERR_NOMEM)
+            {
+                strcpy(error, "Out of memory condition occured");
+            }
+            else
+            {
+                strcpy(error, "Unknwon error");
+            }
+            fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to set mosquitto username / password : %s\n", hostname, world_rank, error);
+            PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
 	}
 #endif
 

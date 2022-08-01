@@ -971,6 +971,31 @@ HIDDEN void send_mosquitto_report(char* topic_ending,
 						   MQTT_PORT,
 						   MQTT_KEEPALIVE);
 
+    if (rc != MOSQ_ERR_SUCCESS)
+    {
+        int world_rank;
+        char hostname[STRING_SIZE];
+        char error[STRING_SIZE] = "\0";
+
+        gethostname(hostname, sizeof(hostname));
+        PMPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+        if (rc == MOSQ_ERR_INVAL)
+        {
+            strcpy(error, "Invalid parameters");
+        }
+        else
+        {
+            int err = strerror_r(rc, error, STRING_SIZE);
+            // if (error[0] == '\0')
+            // {
+            //     strcpy(error, err);
+            // }
+        }
+        fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to connect in mosquitto : %s\n", hostname, world_rank, error);
+        PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
+
 	mosquitto_publish(mosq	  ,
 					  NULL	  ,
 					  topic	  ,
