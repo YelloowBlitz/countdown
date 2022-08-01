@@ -987,10 +987,10 @@ HIDDEN void send_mosquitto_report(char* topic_ending,
         else
         {
             int err = strerror_r(rc, error, STRING_SIZE);
-            // if (error[0] == '\0')
-            // {
-            //     strcpy(error, err);
-            // }
+            if (error[0] == '\0')
+            {
+                strcpy(error, err);
+            }
         }
         fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to connect in mosquitto : %s\n", hostname, world_rank, error);
         PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
