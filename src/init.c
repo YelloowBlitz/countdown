@@ -30,14 +30,23 @@
 
 #include "cntd.h"
 
+CNTD_t *cntd;
+#ifdef MOSQUITTO_ENABLED
+MOSQUITTO_t* mosq;
+#endif
+
 static void read_env()
 {
-	int i;
+	int i, j, world_rank;
+	char hostname[STRING_SIZE];
+
+	gethostname(hostname, sizeof(hostname));
+	PMPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
 	// Enable countdown
 	char *cntd_enable = getenv("CNTD_ENABLE");
 	if(cntd_enable != NULL)
-	{ 
+	{
 		if(strcasecmp(cntd_enable, "analysis") == 0)
 		{
 			cntd->enable_cntd = TRUE;
@@ -52,8 +61,8 @@ static void read_env()
 		}
 		else
 		{
-			fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> The option '%s' is not available for CNTD_ENABLE parameter\n", 
-				cntd->node.hostname, cntd->rank->world_rank, cntd_enable);
+			fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> The option '%s' is not available for CNTD_ENABLE parameter\n",
+				hostname, world_rank, cntd_enable);
 			PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 		}
 	}
@@ -76,8 +85,8 @@ static void read_env()
 		}
 		else
 		{
-			fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> The option '%s' is not available for CNTD_SLACK_ENABLE parameter\n", 
-				cntd->node.hostname, cntd->rank->world_rank, cntd_slack_enable_str);
+			fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> The option '%s' is not available for CNTD_SLACK_ENABLE parameter\n",
+				hostname, world_rank, cntd_slack_enable_str);
 			PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 		}
 	}
@@ -132,30 +141,32 @@ static void read_env()
 		cntd->sampling_time = DEFAULT_SAMPLING_TIME_REPORT;
 
 	// Enable MPI report per rank
-	char *cntd_enable_rank_report = getenv("CNTD_ENABLE_RANK_REPORT");
-	if(str_to_bool(cntd_enable_rank_report))
-		cntd->enable_rank_report = TRUE;
+	char *cntd_enable_report = getenv("CNTD_ENABLE_REPORT");
+	if(str_to_bool(cntd_enable_report))
+		cntd->enable_report = TRUE;
 	else
-		cntd->enable_rank_report = FALSE;
+		cntd->enable_report = FALSE;
+
+	// Enable perf
+	char *cntd_disable_perf = getenv("CNTD_DISABLE_PERF");
+	if(str_to_bool(cntd_disable_perf))
+		cntd->enable_perf = FALSE;
+	else
+		cntd->enable_perf = TRUE;
 
 	// Enable custom perf
-	for(i = 0; i < MAX_NUM_CUSTOM_PERF; i++)
+	for(j = 0; j < MAX_NUM_CUSTOM_PERF; j++)
 	{
 		char perf_env[STRING_SIZE];
-		snprintf(perf_env, sizeof(perf_env), "CNTD_PERF_EVENT_%d", i);
+		snprintf(perf_env, sizeof(perf_env), "CNTD_PERF_EVENT_%d", j);
 		char *cntd_perf_event = getenv(perf_env);
 		if(cntd_perf_event != NULL)
-			cntd->perf_fd[i] = (int) strtoul(cntd_perf_event, 0L, 16);
+			for(i = 0; i < cntd->local_rank_size; i++)
+				cntd->perf_fd[i][j] = (int) strtoul(cntd_perf_event, 0L, 16);
 		else
-			cntd->perf_fd[i] = 0;
+			for(i = 0; i < cntd->local_rank_size; i++)
+				cntd->perf_fd[i][j] = 0;
 	}
-
-	// Save summary report on file
-	char *cntd_save_summary_report = getenv("CNTD_SAVE_SUMMARY_REPORT");
-	if(str_to_bool(cntd_save_summary_report))
-		cntd->save_summary_report = TRUE;
-	else
-		cntd->save_summary_report = FALSE;
 
 	// Output directory
 	char *output_dir = getenv("CNTD_OUTPUT_DIR");
@@ -164,12 +175,12 @@ static void read_env()
 		strncpy(cntd->log_dir, output_dir, STRING_SIZE);
 
 		// Create log dir
-		if(cntd->rank->world_rank == 0)
+		if(world_rank == 0)
 		{
 			if(makedir(cntd->log_dir) < 0)
 			{
-				fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Cannot create output directory: %s\n", 
-					cntd->node.hostname, cntd->rank->world_rank, cntd->log_dir);
+				fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Cannot create output directory: %s\n",
+					hostname, world_rank, cntd->log_dir);
         		PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 			}
 		}
@@ -179,7 +190,7 @@ static void read_env()
 		if(getcwd(cntd->log_dir, STRING_SIZE) == NULL)
 		{
 			fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to get path name of output directory!\n",
-				cntd->node.hostname, cntd->rank->world_rank);
+				hostname, world_rank);
 			PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 		}
 	}
@@ -191,50 +202,25 @@ static void read_env()
 		strncpy(cntd->tmp_dir, tmp_dir, STRING_SIZE);
 
 		// Create tmp dir
-		if(cntd->rank->world_rank == 0)
+		if(world_rank == 0)
 		{
 			if(makedir(cntd->tmp_dir) < 0)
 			{
-				fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Cannot create tmp directory: %s\n", 
-					cntd->node.hostname, cntd->rank->world_rank, cntd->tmp_dir);
+				fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Cannot create tmp directory: %s\n",
+					hostname, world_rank, cntd->tmp_dir);
         		PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 			}
 		}
 	}
 	else
-		strncpy(cntd->tmp_dir, TMP_DIR, STRING_SIZE);
+		strncpy(cntd->tmp_dir, cntd->log_dir, STRING_SIZE);
 
 	PMPI_Barrier(MPI_COMM_WORLD);
 
-	// Check consistency
-	if(cntd->user_pstate[MIN] != NO_CONF && cntd->user_pstate[MIN] < cntd->sys_pstate[MIN])
-	{
-		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> User-defined min p-state cannot be lower \
-			than the min system p-state (min system p-state = %d)!\n", 
-			cntd->node.hostname, cntd->rank->world_rank, cntd->sys_pstate[MIN]);
-		PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-	}
-	if(cntd->user_pstate[MAX] != NO_CONF && cntd->user_pstate[MAX] > cntd->sys_pstate[MAX])
-	{
-		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> User-defined max p-state cannot be greater \
-			than the max system p-state (max system p-state = %d)!\n", 
-			cntd->node.hostname, cntd->rank->world_rank, cntd->sys_pstate[MAX]);
-		PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-	}
-	if(cntd->user_pstate[MAX] != NO_CONF && cntd->user_pstate[MIN] != NO_CONF)
-	{
-		if(cntd->user_pstate[MIN] > cntd->user_pstate[MAX])
-		{
-			fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Max p-state cannot be greater than min p-state!\n",
-				cntd->node.hostname, cntd->rank->world_rank);
-			PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-		}
-	}
-
 	if(cntd->sampling_time > MAX_SAMPLING_TIME_REPORT)
 	{
-		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> The sampling time cannot exceed %d seconds!\n", 
-			cntd->node.hostname, cntd->rank->world_rank, MAX_SAMPLING_TIME_REPORT);
+		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> The sampling time cannot exceed %d seconds!\n",
+			hostname, world_rank, MAX_SAMPLING_TIME_REPORT);
 		PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 	}
 }
@@ -278,15 +264,16 @@ static void init_local_masters()
 	snprintf(shmem_name, sizeof(shmem_name), SHM_FILE, local_rank, postfix);
 	cntd->local_ranks[local_rank] = create_shmem_rank(shmem_name, 1);
 	cntd->rank = cntd->local_ranks[local_rank];
+	cntd->rank->exe_is_started = 0;
 
-	PMPI_Comm_size(cntd->comm_local, &cntd->num_local_ranks);
+	PMPI_Comm_size(cntd->comm_local, &cntd->local_rank_size);
 
 	PMPI_Barrier(MPI_COMM_WORLD);
 
 	cntd->rank->world_rank = world_rank;
 	cntd->rank->local_rank = local_rank;
 
-	for(i = 0; i < cntd->num_local_ranks; i++)
+	for(i = 0; i < cntd->local_rank_size; i++)
 	{
 		if(i == local_rank)
 			continue;
@@ -301,26 +288,166 @@ static void init_local_masters()
 static void finalize_local_masters()
 {
 	char postfix[STRING_SIZE], shmem_name[STRING_SIZE];
-	
+
 	get_rand_postfix(postfix, STRING_SIZE);
 	snprintf(shmem_name, sizeof(shmem_name), SHM_FILE, cntd->rank->local_rank, postfix);
 	destroy_shmem_cpu(cntd->rank, 1, shmem_name);
 }
 
+#ifdef MOSQUITTO_ENABLED
+HIDDEN void send_mosquitto_init(char* topic_ending, time_t time, double payload_value)
+{
+    char postfix[STRING_SIZE];
+    get_rand_postfix(postfix, STRING_SIZE);
+
+    char topic[STRING_SIZE];
+    char topic_tmp[STRING_SIZE];
+
+    snprintf(topic_tmp, STRING_SIZE, "node/%s/%s", cntd->rank->hostname, topic_ending);
+    snprintf(topic, STRING_SIZE, MQTT_TOPIC, postfix, topic_tmp);
+
+    char payload[STRING_SIZE];
+    snprintf(payload, STRING_SIZE, "%f;%ld", time, payload_value);
+
+    int p_length = strlen(payload);
+
+    int err_publish = mosquitto_publish(mosq, NULL, topic, p_length, payload, MQTT_QOS, MQTT_RETAIN);
+
+    if (err_publish != MOSQ_ERR_SUCCESS)
+    {
+        int world_rank;
+        char hostname[STRING_SIZE];
+
+        gethostname(hostname, sizeof(hostname));
+        PMPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+        fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to public in mosquitto to %s:%d : start_time\n", hostname, world_rank, MQTT_HOST, MQTT_PORT);
+        PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
+}
+#endif
+
 HIDDEN void start_cntd()
 {
 	cntd = (CNTD_t *) calloc(1, sizeof(CNTD_t));
 
+	hwp_usage = 0;
+
 	// Init local masters
 	init_local_masters();
-
-	// Read P-state configurations
-	init_arch_conf();
 
 	// Read environment variables
 	read_env();
 
+	// Init PM
+	if(cntd->enable_eam_freq) {
+		pm_init();
+		// Checking HWP-States' usability.
+#ifdef HWP_AVAIL
+		uint64_t pstate;
+
+		pstate = read_msr(IA32_PM_ENABLE);
+
+		if (pstate)
+			hwp_usage = 1;
+		else
+			fprintf(stdout, "Warning: HWP-States available, but not usable.\n");
+#endif
+	}
+
+	// Read P-state configurations
+	init_arch_conf();
+
+#ifdef MOSQUITTO_ENABLED
+    time_t start_time;
+	if(cntd->rank->local_rank == 0) {
+		char client_id[STRING_SIZE];
+
+		memset(client_id,
+			   0	   	,
+			   STRING_SIZE);
+
+		snprintf(client_id						  ,
+				 STRING_SIZE					  ,
+				 "COUNTDOWN-MQTT-node:%s-rank:%d,",
+				 cntd->node.hostname			  ,
+				 cntd->rank->world_rank);
+
+		mosquitto_lib_init();
+
+		mosq = mosquitto_new(client_id, true, 0);
+
+		int err = mosquitto_username_pw_set(mosq, "hpe", "m0squ1tt0321");
+
+        if (err != MOSQ_ERR_SUCCESS)
+        {
+            int world_rank;
+            char hostname[STRING_SIZE];
+            char error[STRING_SIZE] = "\0";
+
+            gethostname(hostname, sizeof(hostname));
+            PMPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+            if (err == MOSQ_ERR_INVAL)
+            {
+                strncpy(error, "Invalid parameters", sizeof(error));
+            }
+            else if (err == MOSQ_ERR_NOMEM)
+            {
+                strncpy(error, "Out of memory condition occured", sizeof(error));
+            }
+            else
+            {
+                strncpy(error, "Unknwon error", sizeof(error));
+            }
+            fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to set mosquitto username / password : %s\n", hostname, world_rank, error);
+            PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
+
+        printf("Mosquitto connect\n");
+        int rc = mosquitto_connect(mosq, MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE);
+
+        if (rc != MOSQ_ERR_SUCCESS)
+        {
+            int world_rank;
+            char hostname[STRING_SIZE];
+            char error[STRING_SIZE] = "\0";
+
+            gethostname(hostname, sizeof(hostname));
+            PMPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+            if (rc == MOSQ_ERR_INVAL)
+            {
+                strncpy(error, "Invalid parameters", sizeof(error));
+            }
+            else
+            {
+                char* err = strerror_r(rc, error, STRING_SIZE);
+                if (error[0] == '\0')
+                {
+                    strncpy(error, err, sizeof(error));
+                }
+            }
+            fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to connect in mosquitto to %s:%d : %s\n", hostname, world_rank, MQTT_HOST, MQTT_PORT, error);
+            PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
+
+	    time(&start_time);
+
+        send_mosquitto_init("start_time", start_time, start_time);
+        send_mosquitto_init("num_sockets", start_time, cntd->node.num_sockets);
+        send_mosquitto_init("num_cpus", start_time, cntd->node.num_cpus);
+    }
+#endif
+
+	// Init the node sampling
 	init_time_sample();
+
+#if defined(MOSQUITTO_ENABLED) && defined(NVIDIA_GPU)
+    if(cntd->rank->local_rank == 0) {
+        send_mosquitto_init("num_gpus", start_time, cntd->node.num_gpus);
+    }
+#endif
 
 	if(cntd->enable_timeseries_report)
 		init_timeseries_report();
@@ -342,13 +469,72 @@ HIDDEN void stop_cntd()
 
 	finalize_time_sample();
 
+#ifdef MOSQUITTO_ENABLED
+	if(cntd->rank->local_rank == 0) {
+        time_t end_time;
+	    time(&end_time);
+
+        double exe_time = cntd->local_ranks[0]->exe_time[END] - cntd->local_ranks[0]->exe_time[START];
+
+        send_mosquitto_init("exe_time", end_time, exe_time);
+        send_mosquitto_init("end_time", end_time, end_time);
+
+        printf("Mosquitto disconnect\n");
+        int err = mosquitto_disconnect(mosq);
+
+        if (err != MOSQ_ERR_SUCCESS)
+        {
+            int world_rank;
+            char hostname[STRING_SIZE];
+
+            gethostname(hostname, sizeof(hostname));
+            PMPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+            if (err == MOSQ_ERR_NO_CONN)
+            {
+                fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to disconnect from mosquitto %s:%d : the client isn't connected\n", hostname, world_rank, MQTT_HOST, MQTT_PORT);
+            }
+            else
+            {
+                fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to disconnect from mosquitto %s:%d : the client isn't connected\n", hostname, world_rank, MQTT_HOST, MQTT_PORT);
+            }
+        }
+
+		mosquitto_destroy(mosq);
+
+		mosquitto_lib_cleanup();
+	}
+#endif
+
+	if(cntd->enable_eam_freq) {
+#ifdef CPUFREQ
+		char filename[STRING_SIZE];
+
+		snprintf(filename			 ,
+				 STRING_SIZE		 ,
+				 CUR_CPUINFO_MIN_FREQ,
+				 cntd->rank->cpu_id);
+		write_int_to_file(filename,
+						  cntd->sys_pstate[MIN]);
+
+		snprintf(filename			 ,
+				 STRING_SIZE		 ,
+				 CUR_CPUINFO_MAX_FREQ,
+				 cntd->rank->cpu_id);
+		write_int_to_file(filename,
+						  cntd->sys_pstate[MAX]);
+#endif
+		// Finalize PM
+		pm_finalize();
+	}
+
 	print_final_report();
-	
+
 	if(cntd->enable_timeseries_report)
 		finalize_timeseries_report();
 
 	finalize_local_masters();
-	
+
 	free(cntd);
 }
 
@@ -361,7 +547,7 @@ HIDDEN void call_start(MPI_Type_t mpi_type, MPI_Comm comm, int addr)
 		eam_start_mpi();
 	else if(cntd->enable_cntd_slack)
 		eam_slack_start_mpi(mpi_type, comm, addr);
-	
+
 	event_sample_start(mpi_type);
 }
 
@@ -374,7 +560,7 @@ HIDDEN void call_end(MPI_Type_t mpi_type, MPI_Comm comm, int addr)
 		eam_flag = eam_end_mpi();
 	else if(cntd->enable_cntd_slack)
 		eam_flag = eam_slack_end_mpi(mpi_type, comm, addr);
-	
+
 	event_sample_end(mpi_type, eam_flag);
 
 	cntd->into_mpi = FALSE;

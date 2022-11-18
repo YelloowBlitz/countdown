@@ -58,6 +58,29 @@ HIDDEN int read_str_from_file(char *filename, char *str)
         return 0;
 }
 
+HIDDEN int write_int_to_file(char* filename, int value) {
+    char svalue[STRING_SIZE];
+    int fd = open(filename,
+				  O_RDWR);
+
+    if (fd == -1)
+        return -1;
+
+    sprintf(svalue,
+            "%d"  ,
+            value);
+
+	int err = write(fd	  ,
+					svalue,
+					sizeof(char) * STRING_SIZE);
+	close(fd);
+
+    if (err < 0)
+        return -1;
+
+    return 0;
+}
+
 HIDDEN double read_time()
 {
     struct timespec sample;
@@ -158,13 +181,13 @@ HIDDEN MPI_Datatype get_mpi_datatype_rank()
     MPI_Datatype tmp_type, cpu_type;
     MPI_Aint lb, extent;
 
-    int count = 17;
+    int count = 18;
 
     int array_of_blocklengths[] = {1,                     // world_rank
                                    1,                     // local_rank
-                                   1,                     // cpu_id
-                                   1,                     // socket_id
                                    STRING_SIZE,           // hostname
+                                   1,                     // cpu_id
+                                   1,                     // pid
                                    1,                     // num_sampling
                                    2,                     // exe_time
                                    2,                     // app_time
@@ -175,14 +198,15 @@ HIDDEN MPI_Datatype get_mpi_datatype_rank()
                                    MAX_NUM_PERF_EVENTS*2, // perf
                                    NUM_MPI_TYPE,          // mpi_type_cnt
                                    NUM_MPI_TYPE,          // mpi_type_time
+                                   NUM_MPI_TYPE*2,        // mpi_type_data
                                    NUM_MPI_TYPE,          // cntd_mpi_type_cnt
                                    NUM_MPI_TYPE};         // cntd_mpi_type_time
 
     MPI_Datatype array_of_types[] = {MPI_INT,             // world_rank
                                      MPI_INT,             // local_rank
-                                     MPI_INT,             // cpu_id
-                                     MPI_INT,             // socket_id
                                      MPI_CHAR,            // hostname
+                                     MPI_INT,             // cpu_id
+                                     MPI_INT,             // pid
                                      MPI_UINT64_T,        // num_sampling
                                      MPI_DOUBLE,          // exe_time
                                      MPI_DOUBLE,          // app_time
@@ -193,14 +217,15 @@ HIDDEN MPI_Datatype get_mpi_datatype_rank()
                                      MPI_UINT64_T,        // perf
                                      MPI_UINT64_T,        // mpi_type_cnt
                                      MPI_DOUBLE,          // mpi_type_time
+                                     MPI_UINT64_T,        // mpi_type_data
                                      MPI_UINT64_T,        // cntd_mpi_type_cnt
                                      MPI_DOUBLE};         // cntd_mpi_type_time
 
     MPI_Aint array_of_displacements[] = {offsetof(CNTD_RankInfo_t, world_rank),
                                          offsetof(CNTD_RankInfo_t, local_rank),
-                                         offsetof(CNTD_RankInfo_t, cpu_id),
-                                         offsetof(CNTD_RankInfo_t, socket_id),
                                          offsetof(CNTD_RankInfo_t, hostname),
+                                         offsetof(CNTD_RankInfo_t, cpu_id),
+                                         offsetof(CNTD_RankInfo_t, pid),
                                          offsetof(CNTD_RankInfo_t, num_sampling),
                                          offsetof(CNTD_RankInfo_t, exe_time),
                                          offsetof(CNTD_RankInfo_t, app_time),
@@ -211,6 +236,7 @@ HIDDEN MPI_Datatype get_mpi_datatype_rank()
                                          offsetof(CNTD_RankInfo_t, perf),
                                          offsetof(CNTD_RankInfo_t, mpi_type_cnt),
                                          offsetof(CNTD_RankInfo_t, mpi_type_time),
+                                         offsetof(CNTD_RankInfo_t, mpi_type_data),
                                          offsetof(CNTD_RankInfo_t, cntd_mpi_type_cnt),
                                          offsetof(CNTD_RankInfo_t, cntd_mpi_type_time)};
 
@@ -227,14 +253,13 @@ HIDDEN MPI_Datatype get_mpi_datatype_node()
     MPI_Datatype tmp_type, node_type;
     MPI_Aint lb, extent;
 
-    int count = 10;
+    int count = 9;
 
     int array_of_blocklengths[] = {STRING_SIZE,     // hostname
                                    1,               // num_sockets
                                    1,               // num_cores
                                    1,               // num_cpus
                                    1,               // num_gpus
-                                   1,               // num_sampling
                                    1,               // energy_sys
                                    MAX_NUM_SOCKETS, // energy_pkg
                                    MAX_NUM_SOCKETS, // energy_dram
@@ -245,7 +270,6 @@ HIDDEN MPI_Datatype get_mpi_datatype_node()
                                      MPI_INT,       // num_cores
                                      MPI_INT,       // num_cpus
                                      MPI_INT,       // num_gpus
-                                     MPI_UINT64_T,  // num_sampling
                                      MPI_UINT64_T,  // energy_sys
                                      MPI_UINT64_T,  // energy_pkg
                                      MPI_UINT64_T,  // energy_dram
@@ -256,7 +280,6 @@ HIDDEN MPI_Datatype get_mpi_datatype_node()
                                          offsetof(CNTD_NodeInfo_t, num_cores),
                                          offsetof(CNTD_NodeInfo_t, num_cpus),
                                          offsetof(CNTD_NodeInfo_t, num_gpus),
-                                         offsetof(CNTD_NodeInfo_t, num_sampling),
                                          offsetof(CNTD_NodeInfo_t, energy_sys),
                                          offsetof(CNTD_NodeInfo_t, energy_pkg),
                                          offsetof(CNTD_NodeInfo_t, energy_dram),
@@ -275,11 +298,10 @@ HIDDEN MPI_Datatype get_mpi_datatype_gpu()
     MPI_Datatype tmp_type, gpu_type;
     MPI_Aint lb, extent;
 
-    int count = 8;
+    int count = 7;
 
     int array_of_blocklengths[] = {STRING_SIZE,     // hostname
                                    1,               // num_gpus
-                                   1,               // num_sampling
                                    MAX_NUM_GPUS,    // util
                                    MAX_NUM_GPUS,    // util_mem
                                    MAX_NUM_GPUS,    // temp
@@ -288,7 +310,6 @@ HIDDEN MPI_Datatype get_mpi_datatype_gpu()
 
     MPI_Datatype array_of_types[] = {MPI_CHAR,      // hostname
                                      MPI_UNSIGNED,  // num_gpus
-                                     MPI_UINT64_T,  // num_sampling
                                      MPI_UINT64_T,  // util
                                      MPI_UINT64_T,  // util_mem
                                      MPI_UINT64_T,  // temp
@@ -297,7 +318,6 @@ HIDDEN MPI_Datatype get_mpi_datatype_gpu()
 
     MPI_Aint array_of_displacements[] = {offsetof(CNTD_GPUInfo_t, hostname),
                                          offsetof(CNTD_GPUInfo_t, num_gpus),
-                                         offsetof(CNTD_GPUInfo_t, num_sampling),
                                          offsetof(CNTD_GPUInfo_t, util),
                                          offsetof(CNTD_GPUInfo_t, util_mem),
                                          offsetof(CNTD_GPUInfo_t, temp),
@@ -319,25 +339,25 @@ HIDDEN long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu
 
 HIDDEN CNTD_RankInfo_t* create_shmem_rank(const char shmem_name[], int num_elem)
 {
-    int fd, my_rank;
+    int fd, world_rank;
     CNTD_RankInfo_t *shmem_ptr;
     char hostname[STRING_SIZE];
 
     gethostname(hostname, sizeof(hostname));
-	PMPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+	PMPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
     fd = shm_open(shmem_name, O_RDWR | O_CREAT, 0660);
     if(fd == -1)
     {
         fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed malloc for shared memory CPU!\n",
-            hostname, my_rank);
+            hostname, world_rank);
         PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
     if(ftruncate(fd, sizeof(CNTD_RankInfo_t) * num_elem) == -1)
     {
         fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed ftruncate for shared memory CPU!\n",
-            hostname, my_rank);
+            hostname, world_rank);
         PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
@@ -345,7 +365,7 @@ HIDDEN CNTD_RankInfo_t* create_shmem_rank(const char shmem_name[], int num_elem)
     if(shmem_ptr == MAP_FAILED)
     {
         fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed mmap for shared memory CPU!\n",
-            hostname, my_rank);
+            hostname, world_rank);
         PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
     memset(shmem_ptr, 0, sizeof(CNTD_RankInfo_t) * num_elem);
@@ -361,18 +381,18 @@ HIDDEN void destroy_shmem_cpu(CNTD_RankInfo_t *shmem_ptr, int num_elem, const ch
 
 HIDDEN CNTD_RankInfo_t* get_shmem_cpu(const char shmem_name[], int num_elem)
 {
-    int fd, my_rank;
+    int fd, world_rank;
     CNTD_RankInfo_t *shmem_ptr;
     char hostname[STRING_SIZE];
 
     gethostname(hostname, sizeof(hostname));
-    PMPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    PMPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
     fd = shm_open(shmem_name, O_RDWR, 0);
     if(fd == -1)
     {
         fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to get the shared memory: %s\n",
-            hostname, my_rank, shmem_name);
+            hostname, world_rank, shmem_name);
         PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
@@ -380,18 +400,19 @@ HIDDEN CNTD_RankInfo_t* get_shmem_cpu(const char shmem_name[], int num_elem)
     if(shmem_ptr == MAP_FAILED)
     {
         fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> FFailed to get the shared memory: %s\n",
-            hostname, my_rank, shmem_name);
+            hostname, world_rank, shmem_name);
         PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
     return shmem_ptr;
 }
 
-HIDDEN void add_network(MPI_Comm comm,
+HIDDEN void add_network(MPI_Comm comm, MPI_Type_t type,
     const int *send_count, MPI_Datatype *send_type, int dest,
 	const int *recv_count, MPI_Datatype *recv_type, int source)
 {
 	int i, comm_size, send_size, recv_size;
+    uint64_t data;
 
 	// Send
     if(dest == MPI_NONE);
@@ -399,14 +420,20 @@ HIDDEN void add_network(MPI_Comm comm,
 	{
         PMPI_Comm_size(comm, &comm_size);
 		PMPI_Type_size(*send_type, &send_size);
-		cntd->rank->mpi_net_data[SEND][TOT] += (*send_count) * send_size * comm_size;
+        data = (*send_count) * send_size * comm_size;
+		cntd->rank->mpi_net_data[SEND][TOT] += data;
+        cntd->rank->mpi_type_data[SEND][type] += data;
 	}
 	else if(dest == MPI_ALLV)
 	{
         PMPI_Comm_size(comm, &comm_size);
 		PMPI_Type_size(*send_type, &send_size);
 		for(i = 0; i < comm_size; i++)
-			cntd->rank->mpi_net_data[SEND][TOT] += send_count[i] * send_size;
+        {
+            data = send_count[i] * send_size;
+			cntd->rank->mpi_net_data[SEND][TOT] += data;
+            cntd->rank->mpi_type_data[SEND][type] += data;
+        }
 	}
 	else if(dest == MPI_ALLW)
 	{
@@ -414,13 +441,17 @@ HIDDEN void add_network(MPI_Comm comm,
 		for(i = 0; i < comm_size; i++)
 		{
 			PMPI_Type_size(send_type[i], &send_size);
-			cntd->rank->mpi_net_data[SEND][TOT] += send_count[i] * send_size;
+            data = send_count[i] * send_size;
+			cntd->rank->mpi_net_data[SEND][TOT] += data;
+            cntd->rank->mpi_type_data[SEND][type] += data;
 		}
 	}
     else
 	{ 
         PMPI_Type_size(*send_type, &send_size);
-		cntd->rank->mpi_net_data[SEND][TOT] += (*send_count) * send_size;
+        data = (*send_count) * send_size;
+		cntd->rank->mpi_net_data[SEND][TOT] += data;
+        cntd->rank->mpi_type_data[SEND][type] += data;
     }
 
 	// Receive
@@ -429,14 +460,20 @@ HIDDEN void add_network(MPI_Comm comm,
 	{
         PMPI_Comm_size(comm, &comm_size);
 		PMPI_Type_size(*recv_type, &recv_size);
-		cntd->rank->mpi_net_data[RECV][TOT] += (*recv_count) * recv_size * comm_size;
+        data = (*recv_count) * recv_size * comm_size;
+		cntd->rank->mpi_net_data[RECV][TOT] += data;
+        cntd->rank->mpi_type_data[RECV][type] += data;
 	}
 	else if(source == MPI_ALLV)
 	{
 		PMPI_Comm_size(comm, &comm_size);
 		PMPI_Type_size(*recv_type, &recv_size);
 		for(i = 0; i < comm_size; i++)
-			cntd->rank->mpi_net_data[RECV][TOT] += recv_count[i] * recv_size;
+        {
+            data = recv_count[i] * recv_size;
+			cntd->rank->mpi_net_data[RECV][TOT] += data;
+            cntd->rank->mpi_type_data[RECV][type] += data;
+        }
 	}
 	else if(source == MPI_ALLW)
 	{
@@ -445,17 +482,21 @@ HIDDEN void add_network(MPI_Comm comm,
 		for(i = 0; i < comm_size; i++)
 		{
 			PMPI_Type_size(recv_type[i], &recv_size);
-			cntd->rank->mpi_net_data[RECV][TOT] += recv_count[i] * recv_size;
+            data = recv_count[i] * recv_size;
+			cntd->rank->mpi_net_data[RECV][TOT] += data;
+            cntd->rank->mpi_type_data[RECV][type] += data;
 		}
 	}
     else
 	{
 		PMPI_Type_size(*recv_type, &recv_size);
-		cntd->rank->mpi_net_data[RECV][TOT] += (*recv_count) * recv_size;
+        data = (*recv_count) * recv_size;
+		cntd->rank->mpi_net_data[RECV][TOT] += data;
+        cntd->rank->mpi_type_data[RECV][type] += data;
 	}
 }
 
-HIDDEN void add_file(
+HIDDEN void add_file(MPI_Type_t type,
 	int read_count, MPI_Datatype read_datatype,
 	int write_count, MPI_Datatype write_datatype)
 {
@@ -463,30 +504,44 @@ HIDDEN void add_file(
 	{
         int read_size;
 		PMPI_Type_size(read_datatype, &read_size);
-		cntd->rank->mpi_file_data[READ][TOT] += read_count * read_size;
+        uint64_t data = read_count * read_size;
+		cntd->rank->mpi_file_data[READ][TOT] += data;
+        cntd->rank->mpi_type_data[RECV][type] += data;
 	}
 
 	if(write_count > 0)
 	{
         int write_size;
 		PMPI_Type_size(write_datatype, &write_size);
-		cntd->rank->mpi_file_data[WRITE][TOT] = write_count * write_size;
+        uint64_t data = write_count * write_size;
+		cntd->rank->mpi_file_data[WRITE][TOT] += data;
+        cntd->rank->mpi_type_data[SEND][type] += data;
 	}
 }
 
 HIDDEN void get_rand_postfix(char *postfix, int size)
 {
-    char *job_id =  getenv("SLURM_JOB_ID");
+	char* job_id;
+	unsigned int jid;
+
+	job_id = getenv("SLURM_JOB_ID");
+
 	if(job_id == NULL)
 	{
 		job_id = getenv("PBS_JOBID");
+
 		if(job_id == NULL)
-			snprintf(postfix, size, "%u", getuid());
+			jid = getuid();
         else
-            strncpy(postfix, job_id, sizeof(job_id));
+			jid = atoi(job_id);
 	}
     else
-        strncpy(postfix, job_id, sizeof(job_id));
+		jid = atoi(job_id);
+
+	snprintf(postfix,
+			 size	,
+			 "%u"	,
+			 jid);
 }
 
 #ifdef INTEL

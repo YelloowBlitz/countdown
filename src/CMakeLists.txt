@@ -39,7 +39,8 @@ set(SOURCES
 	tool.c
 	timer.c
 	wrapper_pmpi_c_cpp.c
-	wrapper_pmpi_fortran.c)
+	wrapper_pmpi_fortran.c
+	hwp.c)
 
 # Add dynamic library
 add_library(cntd SHARED ${SOURCES})
@@ -52,17 +53,24 @@ set(CMAKE_C_FLAGS "-g")
 
 # Define target architecture
 if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-	target_compile_definitions(cntd
-		PRIVATE 
-			"INTEL")
+	execute_process(
+		COMMAND bash -c "lscpu | grep 'Vendor ID:' | cut -d: -f2 | tr -d ' ' | tr -d '\n'"
+		OUTPUT_VARIABLE ARCH)
+	if("${ARCH}" STREQUAL "GenuineIntel")
+		target_compile_definitions(cntd
+			PRIVATE "INTEL")
+	elseif("${ARCH}" STREQUAL "AuthenticAMD")
+		target_compile_definitions(cntd
+			PRIVATE "AMD")
+	else()
+		message(FATAL_ERROR "It was not possible to detect the x86_64 vendor ID (INTEL|AMD)")
+	endif()
 elseif(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "ppc64le")
 	target_compile_definitions(cntd
-		PRIVATE 
-			"POWER9")
+		PRIVATE "POWER9")
 elseif(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
 	target_compile_definitions(cntd
-		PRIVATE 
-			"THUNDERX2")	
+		PRIVATE "THUNDERX2")	
 else()
 	message(FATAL_ERROR "The architecture ${CMAKE_SYSTEM_PROCESSOR} is not supported!")
 endif()

@@ -30,48 +30,50 @@
 
 #include "cntd.h"
 
-static int flag_eam = FALSE;
+_Bool hwp_usage;
 
-static void eam_callback()
-{
-	flag_eam = TRUE;
-	set_min_pstate();
+#ifdef HWP_AVAIL
+// Max "Energy_Performance_Preference".
+HIDDEN void set_max_epp() {
+	int offset;
+	uint64_t pstate;
+
+	offset = IA32_HWP_REQUEST;
+	pstate = 0xFF;
+
+	write_msr(offset, pstate << 24);
 }
 
-HIDDEN void eam_start_mpi()
-{
-	flag_eam = FALSE;
-	if(cntd->eam_timeout > 0)
-		start_timer();
-	else
-		eam_callback();
+// Max "Activity_Window".
+HIDDEN void set_max_aw() {
+	int offset;
+	uint64_t pstate;
+
+	offset = IA32_HWP_REQUEST;
+	pstate = 0x3FF;
+
+	write_msr(offset, pstate << 32);
 }
 
-HIDDEN int eam_end_mpi()
-{
-	if(cntd->eam_timeout > 0)
-		reset_timer();
+// Min "Energy_Performance_Preference".
+HIDDEN void set_min_epp() {
+	int offset;
+	int pstate;
 
-	// Set maximum frequency if timer is expired
-	if(flag_eam)
-	{
-		set_max_pstate();
-		flag_eam = FALSE;
-		return TRUE;
-	}
-	return FALSE;
+	offset = IA32_HWP_REQUEST;
+	pstate = 0x00;
+
+	write_msr(offset, pstate << 24);
 }
 
-HIDDEN void eam_init()
-{
-	// Initialization of timer
-	if(cntd->eam_timeout > 0)
-		init_timer(eam_callback);
-}
+// Min "Activity_Window".
+HIDDEN void set_min_aw() {
+	int offset;
+	uint64_t pstate;
 
-HIDDEN void eam_finalize()
-{
-	// Reset timer and set maximum system p-state
-	if(cntd->eam_timeout > 0)
-		finalize_timer();
+	offset = IA32_HWP_REQUEST;
+	pstate = 0x01;
+
+	write_msr(offset, pstate << 32);
 }
+#endif
