@@ -44,7 +44,7 @@ static void print_rank_mpi(CNTD_RankInfo_t *rankinfo, uint64_t *mpi_type_cnt)
 	FILE *fd = fopen(filename, "w");
 	if(fd == NULL)
 	{
-		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to create the rank mpi report: %s\n", 
+		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to create the rank mpi report: %s\n",
 			cntd->node.hostname, cntd->rank->world_rank, filename);
 		PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 	}
@@ -99,7 +99,7 @@ static void print_rank(CNTD_RankInfo_t *rankinfo, double exe_time)
 	FILE *fd = fopen(filename, "w");
 	if(fd == NULL)
 	{
-		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to create the rank report: %s\n", 
+		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to create the rank report: %s\n",
 			cntd->node.hostname, cntd->rank->world_rank, filename);
 		PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 	}
@@ -115,8 +115,8 @@ static void print_rank(CNTD_RankInfo_t *rankinfo, double exe_time)
 	for(i = 0; i < world_size; i++)
 	{
 		fprintf(fd, "%d;%s;%d;%.9f;%.9f;%ld;%.3f;%0.f;%lu;%lu",
-			rankinfo[i].world_rank, 
-			rankinfo[i].hostname, 
+			rankinfo[i].world_rank,
+			rankinfo[i].hostname,
 			rankinfo[i].cpu_id,
 			rankinfo[i].app_time[TOT],
 			rankinfo[i].mpi_time[TOT],
@@ -148,7 +148,7 @@ static void print_mpi_report(uint64_t *mpi_type_cnt, double *mpi_type_time, uint
 	FILE *fd = fopen(filename, "w");
 	if(fd == NULL)
 	{
-		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to create the mpi report: %s\n", 
+		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to create the mpi report: %s\n",
 			cntd->node.hostname, cntd->rank->world_rank, filename);
 		PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 	}
@@ -159,10 +159,10 @@ static void print_mpi_report(uint64_t *mpi_type_cnt, double *mpi_type_time, uint
 	// Data
 	for(i = 0; i < NUM_MPI_TYPE; i++)
 		if(mpi_type_cnt[i] > 0)
-			fprintf(fd, "%s;%lu;%.9f;%lu;%lu\n", 
-				mpi_type_str[i]+2, 
-				mpi_type_cnt[i], 
-				mpi_type_time[i], 
+			fprintf(fd, "%s;%lu;%.9f;%lu;%lu\n",
+				mpi_type_str[i]+2,
+				mpi_type_cnt[i],
+				mpi_type_time[i],
 				mpi_data_send[i],
 				mpi_data_recv[i]);
 
@@ -181,14 +181,14 @@ static void print_eam_report(uint64_t *cntd_mpi_type_cnt, double *cntd_mpi_type_
 		snprintf(filename, STRING_SIZE, "%s/"EAM_SLACK_REPORT_FILE, cntd->log_dir);
 	else
 	{
-		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Misconfiguration of eam report call: %s\n", 
+		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Misconfiguration of eam report call: %s\n",
 			cntd->node.hostname, cntd->rank->world_rank, filename);
 		PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 	}
 	FILE *fd = fopen(filename, "w");
 	if(fd == NULL)
 	{
-		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to create the eam report: %s\n", 
+		fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to create the eam report: %s\n",
 			cntd->node.hostname, cntd->rank->world_rank, filename);
 		PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 	}
@@ -199,9 +199,9 @@ static void print_eam_report(uint64_t *cntd_mpi_type_cnt, double *cntd_mpi_type_
 	// Data
 	for(i = 0; i < NUM_MPI_TYPE; i++)
 		if(cntd_mpi_type_cnt[i] > 0)
-			fprintf(fd, "%s;%lu;%.9f\n", 
-				mpi_type_str[i]+2, 
-				cntd_mpi_type_cnt[i], 
+			fprintf(fd, "%s;%lu;%.9f\n",
+				mpi_type_str[i]+2,
+				cntd_mpi_type_cnt[i],
 				cntd_mpi_type_time[i]);
 
 	fclose(fd);
@@ -220,7 +220,7 @@ HIDDEN void print_final_report()
 	MPI_Datatype node_type = get_mpi_datatype_node();
 	MPI_Datatype cpu_type = get_mpi_datatype_rank();
 	MPI_Datatype gpu_type = get_mpi_datatype_gpu();
-	
+
 	CNTD_NodeInfo_t nodeinfo[local_master_size];
 	CNTD_RankInfo_t rankinfo[world_size];
 	CNTD_GPUInfo_t gpuinfo[local_master_size];
@@ -373,7 +373,7 @@ HIDDEN void print_final_report()
 			summary_report_fd = fopen(filename, "w");
 			if(summary_report_fd == NULL)
 			{
-				fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to create the summary report: %s\n", 
+				fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to create the summary report: %s\n",
 					cntd->node.hostname, cntd->rank->world_rank, filename);
 				PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 			}
@@ -440,7 +440,7 @@ HIDDEN void print_final_report()
 		printf("Number of Sockets:     	%u\n", num_sockets);
 		printf("Number of CPUs:     	%u\n", num_cpus);
 		if(cntd->enable_report)
-			fprintf(summary_report_fd, ";%d;%d;%u;%u", 
+			fprintf(summary_report_fd, ";%d;%d;%u;%u",
 				world_size, local_master_size, num_sockets, num_cpus);
 #ifdef NVIDIA_GPU
 		printf("Number of GPUs:         %d\n", num_gpus);
@@ -452,51 +452,55 @@ HIDDEN void print_final_report()
 			printf("##################### ENERGY #########################\n");
 #if defined(INTEL) || defined(POWER9) || defined(THUNDERX2)
 			printf("PKG:                    %.0f J\n", global_energy_pkg);
-			if(cntd->enable_report) 
+			if(cntd->enable_report)
 				fprintf(summary_report_fd, ";%.0f", global_energy_pkg);
 #endif
 #if defined(INTEL) || defined(POWER9)
-			printf("DRAM:                   %.0f J\n", global_energy_dram);
-			if(cntd->enable_report) 
-				fprintf(summary_report_fd, ";%.0f", global_energy_dram);
+			if (global_energy_dram != 0) {
+				printf("DRAM:                   %.0f J\n", global_energy_dram);
+				if(cntd->enable_report)
+					fprintf(summary_report_fd, ";%.0f", global_energy_dram);
+			}
 #endif
 #ifdef NVIDIA_GPU
 			printf("GPU:                    %.0f J\n", global_energy_gpu);
-			if(cntd->enable_report) 
+			if(cntd->enable_report)
 				fprintf(summary_report_fd, ";%.0f", global_energy_gpu);
 #elif POWER9
 			printf("GPU:                    %.0f J\n", global_energy_gpu_sys);
-			if(cntd->enable_report) 
+			if(cntd->enable_report)
 				fprintf(summary_report_fd, ";%.0f", global_energy_gpu_sys);
 #endif
 #ifdef POWER9
 			printf("SYS:                    %.0f J\n", global_energy_sys);
-			if(cntd->enable_report) 
+			if(cntd->enable_report)
 				fprintf(summary_report_fd, ";%.0f", global_energy_sys);
 #endif
 			printf("##################### AVG POWER ######################\n");
 #if defined(INTEL) || defined(POWER9) || defined(THUNDERX2)
 			printf("PKG:                    %.2f W\n", global_energy_pkg / exe_time);
-			if(cntd->enable_report) 
+			if(cntd->enable_report)
 				fprintf(summary_report_fd, ";%.2f", global_energy_pkg / exe_time);
 #endif
 #if defined(INTEL) || defined(POWER9)
-			printf("DRAM:                   %.2f W\n", global_energy_dram / exe_time);
-			if(cntd->enable_report) 
-				fprintf(summary_report_fd, ";%.2f", global_energy_dram / exe_time);
+			if (global_energy_dram != 0) {
+				printf("DRAM:                   %.2f W\n", global_energy_dram / exe_time);
+				if(cntd->enable_report)
+					fprintf(summary_report_fd, ";%.2f", global_energy_dram / exe_time);
+			}
 #endif
 #ifdef NVIDIA_GPU
 			printf("GPU:                    %.2f W\n", global_energy_gpu / exe_time);
-			if(cntd->enable_report) 
+			if(cntd->enable_report)
 				fprintf(summary_report_fd, ";%.2f", global_energy_gpu / exe_time);
 #elif POWER9
 			printf("GPU:                    %.0f J\n", global_energy_gpu_sys / exe_time);
-			if(cntd->enable_report) 
+			if(cntd->enable_report)
 				fprintf(summary_report_fd, ";%.2f", global_energy_gpu_sys / exe_time);
 #endif
 #ifdef POWER9
 			printf("SYS:                    %.2f W\n", global_energy_sys / exe_time);
-			if(cntd->enable_report) 
+			if(cntd->enable_report)
 				fprintf(summary_report_fd, ";%.2f", global_energy_sys / exe_time);
 #endif
 		}
@@ -547,7 +551,7 @@ HIDDEN void print_final_report()
 		else
 			printf("MPI network - TOT:      %.2f EByte\n", (double) (mpi_net_data[SEND] + mpi_net_data[RECV]) / POW_2_60);
 
-		if(cntd->enable_report) 
+		if(cntd->enable_report)
 			fprintf(summary_report_fd, ";%lu;%lu", mpi_net_data[SEND], mpi_net_data[RECV]);
 
 		if(mpi_file_data[WRITE] < POW_2_10)
@@ -595,7 +599,7 @@ HIDDEN void print_final_report()
 		else
 			printf("MPI file    - TOT:      %.2f EByte\n", (double) (mpi_file_data[WRITE] + mpi_file_data[READ]) / POW_2_60);
 
-		if(cntd->enable_report) 
+		if(cntd->enable_report)
 			fprintf(summary_report_fd, ";%lu;%lu", mpi_file_data[WRITE], mpi_file_data[READ]);
 
 		if(max_mem_usage < POW_2_10)
@@ -617,15 +621,15 @@ HIDDEN void print_final_report()
 		printf("AVG CPU frequency:      %.0f MHz\n", avg_freq);
 		printf("Cycles:                 %lu\n", global_cycles);
 		printf("Instructions retired:   %lu\n", global_inst_ret);
-		if(cntd->enable_report) 
-			fprintf(summary_report_fd, ";%.3f;%.0f;%lu;%lu", 
+		if(cntd->enable_report)
+			fprintf(summary_report_fd, ";%.3f;%.0f;%lu;%lu",
 				avg_ipc, avg_freq, global_cycles, global_inst_ret);
 		for(i = 0; i < MAX_NUM_CUSTOM_PERF; i++)
 		{
 			if(cntd->perf_fd[0][i] > 0)
 			{
 				printf("Perf event %d:           %lu\n", i, global_perf[i]);
-				if(cntd->enable_report) 
+				if(cntd->enable_report)
 					fprintf(summary_report_fd, ";%lu", global_perf[i]);
 			}
 		}
@@ -675,10 +679,10 @@ HIDDEN void print_final_report()
 		{
 			if(mpi_type_cnt[j] > 0)
 			{
-				printf("%s: %lu - %.3f Sec (%.2f%%)", 
-					mpi_type_str[j]+2, 
-					mpi_type_cnt[j], 
-					mpi_type_time[j], 
+				printf("%s: %lu - %.3f Sec (%.2f%%)",
+					mpi_type_str[j]+2,
+					mpi_type_cnt[j],
+					mpi_type_time[j],
 					(mpi_type_time[j]/mpi_time)*100.0);
 				if(mpi_type_data[SEND][j])
 				{
@@ -733,9 +737,9 @@ HIDDEN void print_final_report()
 					cntd_impact_cnt += cntd_mpi_type_cnt[j];
 					cntd_impact_time += cntd_mpi_type_time[j];
 					printf("%s: %lu - %.3f Sec (%.2f%%)\n",
-						mpi_type_str[j]+2, 
-						cntd_mpi_type_cnt[j], 
-						cntd_mpi_type_time[j], 
+						mpi_type_str[j]+2,
+						cntd_mpi_type_cnt[j],
+						cntd_mpi_type_time[j],
 						(cntd_mpi_type_time[j]/mpi_time)*100.0);
 				}
 			}
@@ -793,7 +797,7 @@ HIDDEN void init_timeseries_report()
 		timeseries_fd = fopen(filename, "w");
 		if(timeseries_fd == NULL)
 		{
-			fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed create time-series file '%s'!\n", 
+			fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed create time-series file '%s'!\n",
 				cntd->node.hostname, cntd->rank->world_rank, filename);
 			PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 		}
@@ -863,49 +867,49 @@ HIDDEN void init_timeseries_report()
 
 		// Application time
 		for(i = 0; i < cntd->local_rank_size; i++)
-			fprintf(timeseries_fd, ";rank-%d-cpu-%d-app_time", 
+			fprintf(timeseries_fd, ";rank-%d-cpu-%d-app_time",
 				cntd->local_ranks[i]->world_rank, cntd->local_ranks[i]->cpu_id);
 
 		// MPI time
 		for(i = 0; i < cntd->local_rank_size; i++)
-			fprintf(timeseries_fd, ";rank-%d-cpu-%d-mpi_time", 
+			fprintf(timeseries_fd, ";rank-%d-cpu-%d-mpi_time",
 				cntd->local_ranks[i]->world_rank, cntd->local_ranks[i]->cpu_id);
 
 		// MPI network send
 		for(i = 0; i < cntd->local_rank_size; i++)
-			fprintf(timeseries_fd, ";rank-%d-cpu-%d-mpi_net_send", 
+			fprintf(timeseries_fd, ";rank-%d-cpu-%d-mpi_net_send",
 				cntd->local_ranks[i]->world_rank, cntd->local_ranks[i]->cpu_id);
 
 		// MPI network recv
 		for(i = 0; i < cntd->local_rank_size; i++)
-			fprintf(timeseries_fd, ";rank-%d-cpu-%d-mpi_net_recv", 
+			fprintf(timeseries_fd, ";rank-%d-cpu-%d-mpi_net_recv",
 				cntd->local_ranks[i]->world_rank, cntd->local_ranks[i]->cpu_id);
 
 		// Average Frequency
 		for(i = 0; i < cntd->local_rank_size; i++)
-			fprintf(timeseries_fd, ";rank-%d-cpu-%d-freq", 
+			fprintf(timeseries_fd, ";rank-%d-cpu-%d-freq",
 				cntd->local_ranks[i]->world_rank, cntd->local_ranks[i]->cpu_id);
 
 		// Average IPC
 		for(i = 0; i < cntd->local_rank_size; i++)
-			fprintf(timeseries_fd, ";rank-%d-cpu-%d-ipc", 
+			fprintf(timeseries_fd, ";rank-%d-cpu-%d-ipc",
 				cntd->local_ranks[i]->world_rank, cntd->local_ranks[i]->cpu_id);
 
 		// Average cycles
 		for(i = 0; i < cntd->local_rank_size; i++)
-			fprintf(timeseries_fd, ";rank-%d-cpu-%d-cycles", 
+			fprintf(timeseries_fd, ";rank-%d-cpu-%d-cycles",
 				cntd->local_ranks[i]->world_rank, cntd->local_ranks[i]->cpu_id);
 
 		// Average Instructions retired
 		for(i = 0; i < cntd->local_rank_size; i++)
-			fprintf(timeseries_fd, ";rank-%d-cpu-%d-inst_ret", 
+			fprintf(timeseries_fd, ";rank-%d-cpu-%d-inst_ret",
 				cntd->local_ranks[i]->world_rank, cntd->local_ranks[i]->cpu_id);
 
 		// Linux perf
 		for(j = 0; j < MAX_NUM_CUSTOM_PERF; j++)
 			for(i = 0; i < cntd->local_rank_size; i++)
 				if(cntd->perf_fd[i][j] > 0)
-					fprintf(timeseries_fd, ";rank-%d-cpu-%d-perf-event-%d", 
+					fprintf(timeseries_fd, ";rank-%d-cpu-%d-perf-event-%d",
 						cntd->local_ranks[i]->world_rank, cntd->local_ranks[i]->cpu_id, j);
 
 		// End line
@@ -930,19 +934,90 @@ HIDDEN void finalize_timeseries_report()
 	}
 }
 
+#ifdef MOSQUITTO_ENABLED
+HIDDEN void send_mosquitto_report_general(char* topic_ending, double payload_value) {
+	char payload[STRING_SIZE];
+	int p_length; // \"payload\" length.
+	char postfix[STRING_SIZE];
+	int rc = 0;
+	char topic[STRING_SIZE];
+	time_t utc_secs;
+
+	time(&utc_secs);
+
+	get_rand_postfix(postfix, STRING_SIZE);
+
+    snprintf(topic, STRING_SIZE, MQTT_TOPIC, postfix, topic_ending);
+
+    snprintf(payload, STRING_SIZE, MQTT_PAYLOAD, payload_value, utc_secs);
+
+    p_length = strlen(payload);
+
+    int err_publish = mosquitto_publish(mosq, NULL, topic, p_length, payload, MQTT_QOS, MQTT_RETAIN);
+
+    if (err_publish != MOSQ_ERR_SUCCESS)
+    {
+        int world_rank;
+        char hostname[STRING_SIZE];
+
+        gethostname(hostname, sizeof(hostname));
+        PMPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+        fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to publish in mosquitto to %s:%d : %s\n", hostname, world_rank, MQTT_HOST, MQTT_PORT, topic);
+        PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
+}
+
+HIDDEN void send_mosquitto_report(char* topic_ending, int local_rank, double payload_value)
+{
+    char topic_base[STRING_SIZE];
+
+    snprintf(topic_base,
+        STRING_SIZE,
+        "node/%s/cpu/%u/w_rank/%u/l_rank/%u/%s",
+        cntd->rank->hostname,
+        cntd->local_ranks[local_rank]->cpu_id,
+        cntd->local_ranks[local_rank]->world_rank,
+        cntd->local_ranks[local_rank]->local_rank,
+        topic_ending);
+
+    send_mosquitto_report_general(topic_base, payload_value);
+}
+
+HIDDEN void send_mosquitto_report_gpu(char* topic_ending, int num_gpu, double payload_value)
+{
+    char topic_base[STRING_SIZE];
+
+    snprintf(topic_base,
+        STRING_SIZE,
+        "node/%s/gpu/%u/%s",
+        cntd->rank->hostname,
+        num_gpu,
+        topic_ending);
+
+    send_mosquitto_report_general(topic_base, payload_value);
+}
+#endif
+
 HIDDEN void print_timeseries_report(
-	double time_curr, double time_prev, 
-	double energy_sys, double *energy_pkg, double *energy_dram, 
+	double time_curr, double time_prev,
+	double energy_sys, double *energy_pkg, double *energy_dram,
 	double *energy_gpu_sys, double *energy_gpu,
-	unsigned int *util_gpu, unsigned int *util_mem_gpu, 
+	unsigned int *util_gpu, unsigned int *util_mem_gpu,
 	unsigned int *temp, unsigned int *clock)
 {
 	int i, j;
 	double sample_duration = time_curr - time_prev;
 
 	// Time sample
-	fprintf(timeseries_fd, "%.3f", 
+	fprintf(timeseries_fd, "%.3f",
 		time_curr - cntd->rank->exe_time[START]);
+
+#ifdef MOSQUITTO_ENABLED
+    char exe_topic[STRING_SIZE];
+    snprintf(exe_topic, STRING_SIZE, "node/%s/exe_time", cntd->rank->hostname);
+	send_mosquitto_report_general(exe_topic, time_curr - cntd->rank->exe_time[START]);
+#endif
 
 	if(cntd->enable_power_monitor)
 	{
@@ -950,22 +1025,22 @@ HIDDEN void print_timeseries_report(
 		for(i = 0; i < cntd->node.num_sockets; i++)
 		{
 #if defined(INTEL) || defined(POWER9) || defined(THUNDERX2)
-			fprintf(timeseries_fd, ";%.2f", 
+			fprintf(timeseries_fd, ";%.2f",
 				energy_pkg[i]);
 #endif
 #if defined(INTEL) || defined(POWER9)
-			fprintf(timeseries_fd, ";%.2f", 
+			fprintf(timeseries_fd, ";%.2f",
 				energy_dram[i]);
 #endif
 #if defined(POWER9) && !defined(NVIDIA_GPU)
-			fprintf(timeseries_fd, ";%.2f", 
+			fprintf(timeseries_fd, ";%.2f",
 				energy_gpu_sys[i]);
-#endif		
+#endif
 		}
 #ifdef NVIDIA_GPU
 		for(i = 0; i < cntd->gpu.num_gpus; i++)
 			fprintf(timeseries_fd, ";%.2f", energy_gpu[i]);
-#endif	
+#endif
 #ifdef POWER9
 		fprintf(timeseries_fd, ";%.2f", energy_sys);
 #endif
@@ -974,17 +1049,23 @@ HIDDEN void print_timeseries_report(
 		for(i = 0; i < cntd->node.num_sockets; i++)
 		{
 #if defined(INTEL) || defined(POWER9) || defined(THUNDERX2)
-			fprintf(timeseries_fd, ";%.2f", 
+			fprintf(timeseries_fd, ";%.2f",
 				energy_pkg[i] / sample_duration);
+#ifdef MOSQUITTO_ENABLED
+		    send_mosquitto_report("power_pkg", 0, energy_pkg[i] / sample_duration);
+#endif
 #endif
 #if defined(INTEL) || defined(POWER9)
-			fprintf(timeseries_fd, ";%.2f", 
+			fprintf(timeseries_fd, ";%.2f",
 				energy_dram[i] / sample_duration);
+#ifdef MOSQUITTO_ENABLED
+		    send_mosquitto_report("power_dram", 0, energy_dram[i] / sample_duration);
+#endif
 #endif
 #if defined(POWER9) && !defined(NVIDIA_GPU)
-			fprintf(timeseries_fd, ";%.2f", 
+			fprintf(timeseries_fd, ";%.2f",
 				energy_gpu_sys[i] / sample_duration);
-#endif		
+#endif
 		}
 #ifdef NVIDIA_GPU
 		for(i = 0; i < cntd->gpu.num_gpus; i++)
@@ -992,7 +1073,7 @@ HIDDEN void print_timeseries_report(
 				energy_gpu[i] / sample_duration);
 #endif
 #ifdef POWER9
-		fprintf(timeseries_fd, ";%.2f", 
+		fprintf(timeseries_fd, ";%.2f",
 			energy_sys / sample_duration);
 #endif
 	}
@@ -1001,16 +1082,36 @@ HIDDEN void print_timeseries_report(
 #ifdef NVIDIA_GPU
 	// GPU utilization
 	for(i = 0; i < cntd->gpu.num_gpus; i++)
+    {
 		fprintf(timeseries_fd, ";%u", util_gpu[i]);
+#ifdef MOSQUITTO_ENABLED
+		send_mosquitto_report_gpu("util_gpu", i, util_gpu[i]);
+#endif
+    }
 	// GPU memory utilization
 	for(i = 0; i < cntd->gpu.num_gpus; i++)
+    {
 		fprintf(timeseries_fd, ";%u", util_mem_gpu[i]);
+#ifdef MOSQUITTO_ENABLED
+		send_mosquitto_report_gpu("util_mem_gpu", i, util_mem_gpu[i]);
+#endif
+    }
 	// GPU temperature
 	for(i = 0; i < cntd->gpu.num_gpus; i++)
+    {
 		fprintf(timeseries_fd, ";%u", temp[i]);
+#ifdef MOSQUITTO_ENABLED
+		send_mosquitto_report_gpu("temp_gpu", i, temp[i]);
+#endif
+    }
 	// Clock temperature
 	for(i = 0; i < cntd->gpu.num_gpus; i++)
+    {
 		fprintf(timeseries_fd, ";%u", clock[i]);
+#ifdef MOSQUITTO_ENABLED
+		send_mosquitto_report_gpu("clock_gpu", i, temp[i]);
+#endif
+    }
 #endif
 
 	// MPI file write
@@ -1021,49 +1122,91 @@ HIDDEN void print_timeseries_report(
 		mpi_file[WRITE] += cntd->local_ranks[i]->mpi_file_data[WRITE][CURR];
 	}
 	fprintf(timeseries_fd, ";%lu;%lu", mpi_file[READ], mpi_file[WRITE]);
+#ifdef MOSQUITTO_ENABLED
+    send_mosquitto_report("mpi_file_read",  0, mpi_file[READ]);
+    send_mosquitto_report("mpi_file_write", 0, mpi_file[WRITE]);
+#endif
 
 	// Application time
-	for(i = 0; i < cntd->local_rank_size; i++)
+	for(i = 0; i < cntd->local_rank_size; i++) {
 		fprintf(timeseries_fd, ";%.9f", cntd->local_ranks[i]->app_time[CURR]);
+#ifdef MOSQUITTO_ENABLED
+		send_mosquitto_report("app_time", i, cntd->local_ranks[i]->app_time[CURR]);
+#endif
+	}
 
 	// MPI time
-	for(i = 0; i < cntd->local_rank_size; i++)
+	for(i = 0; i < cntd->local_rank_size; i++) {
 		fprintf(timeseries_fd, ";%.9f", cntd->local_ranks[i]->mpi_time[CURR]);
+#ifdef MOSQUITTO_ENABLED
+		send_mosquitto_report("mpi_time", i, cntd->local_ranks[i]->mpi_time[CURR]);
+#endif
+	}
 
 	// MPI network send
 	for(i = 0; i < cntd->local_rank_size; i++)
+    {
 		fprintf(timeseries_fd, ";%lu", cntd->local_ranks[i]->mpi_net_data[SEND][CURR]);
+#ifdef MOSQUITTO_ENABLED
+		send_mosquitto_report("mpi_net_send", i, cntd->local_ranks[i]->mpi_net_data[SEND][CURR]);
+#endif
+    }
 
 	// MPI network recv
 	for(i = 0; i < cntd->local_rank_size; i++)
+    {
 		fprintf(timeseries_fd, ";%lu", cntd->local_ranks[i]->mpi_net_data[RECV][CURR]);
+#ifdef MOSQUITTO_ENABLED
+		send_mosquitto_report("mpi_net_recv", i, cntd->local_ranks[i]->mpi_net_data[RECV][CURR]);
+#endif
+    }
 
 	// Average Frequency
+	double curr_freq;
 	for(i = 0; i < cntd->local_rank_size; i++)
 	{
 #ifdef INTEL
-		fprintf(timeseries_fd, ";%.0f", 
+		fprintf(timeseries_fd, ";%.0f",
 			cntd->local_ranks[i]->perf[PERF_CYCLES_REF][CURR] > 0 ? ((double) cntd->local_ranks[i]->perf[PERF_CYCLES][CURR] / (double) cntd->local_ranks[i]->perf[PERF_CYCLES_REF][CURR]) * cntd->nom_freq_mhz : 0);
+#ifdef MOSQUITTO_ENABLED
+		curr_freq = (cntd->local_ranks[i]->perf[PERF_CYCLES_REF][CURR] > 0 ? ((double) cntd->local_ranks[i]->perf[PERF_CYCLES][CURR] / (double) cntd->local_ranks[i]->perf[PERF_CYCLES_REF][CURR]) * cntd->nom_freq_mhz : 0);
+		send_mosquitto_report("avg_freq", i, curr_freq);
+#endif
 #else
-		fprintf(timeseries_fd, ";%.0f", 
+		fprintf(timeseries_fd, ";%.0f",
 			(double) cntd->local_ranks[i]->perf[PERF_CYCLES][CURR] / ((double) sample_duration * 1.0E6));
 #endif
 	}
 
+    double avg_ipc;
 	// Average IPC
 	for(i = 0; i < cntd->local_rank_size; i++)
 	{
-		fprintf(timeseries_fd, ";%.3f", 
+		fprintf(timeseries_fd, ";%.3f",
 			cntd->local_ranks[i]->perf[PERF_CYCLES][CURR] > 0 ? (double) cntd->local_ranks[i]->perf[PERF_INST_RET][CURR] / (double) cntd->local_ranks[i]->perf[PERF_CYCLES][CURR] : 0);
+#ifdef MOSQUITTO_ENABLED
+        avg_ipc = (cntd->local_ranks[i]->perf[PERF_CYCLES][CURR] > 0 ? (double) cntd->local_ranks[i]->perf[PERF_INST_RET][CURR] / (double) cntd->local_ranks[i]->perf[PERF_CYCLES][CURR] : 0);
+		send_mosquitto_report("avg_ipc", i, avg_ipc);
+#endif
 	}
 
 	// Average cycles
 	for(i = 0; i < cntd->local_rank_size; i++)
+    {
 		fprintf(timeseries_fd, ";%lu", cntd->local_ranks[i]->perf[PERF_CYCLES][CURR]);
+#ifdef MOSQUITTO_ENABLED
+        send_mosquitto_report("avg_cycles", i, cntd->local_ranks[i]->perf[PERF_CYCLES][CURR]);
+#endif
+    }
 
 	// Average Instructions retired
 	for(i = 0; i < cntd->local_rank_size; i++)
+    {
 		fprintf(timeseries_fd, ";%lu", cntd->local_ranks[i]->perf[PERF_INST_RET][CURR]);
+#ifdef MOSQUITTO_ENABLED
+        send_mosquitto_report("avg_inst_retired", i, cntd->local_ranks[i]->perf[PERF_INST_RET][CURR]);
+#endif
+    }
 
 	// Linux perf
 	for(j = 0; j < MAX_NUM_CUSTOM_PERF; j++)
@@ -1074,6 +1217,29 @@ HIDDEN void print_timeseries_report(
 				fprintf(timeseries_fd, ";%lu", cntd->local_ranks[i]->perf[j][CURR]);
 		}
 	}
+
+    // MPI Calls
+#ifdef MOSQUITTO_ENABLED
+    for(i = 0; i < cntd->local_rank_size; i++)
+    {
+        for(j = 0; j < NUM_MPI_TYPE; j++)
+        {
+            uint64_t count = cntd->local_ranks[i]->cntd_mpi_type_cnt[j];
+            if (count > 0)
+            {
+                double time = cntd->local_ranks[i]->cntd_mpi_type_time[j];
+                char name[STRING_SIZE] = "\0";
+                strncpy(name, mpi_type_str[j] + 2, sizeof(name));
+                char topic_ending_count[STRING_SIZE];
+                char topic_ending_time[STRING_SIZE];
+                snprintf(topic_ending_count, STRING_SIZE, "mpi_call/%s/mpi_call_count", name);
+                snprintf(topic_ending_time, STRING_SIZE, "mpi_call/%s/mpi_call_time", name);
+                send_mosquitto_report(topic_ending_count, i, count);
+                send_mosquitto_report(topic_ending_time, i, time);
+            }
+        }
+    }
+#endif
 
 	fprintf(timeseries_fd, "\n");
 }

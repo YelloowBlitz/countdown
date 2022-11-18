@@ -62,6 +62,19 @@
 #include <nvml.h>
 #endif
 
+#ifdef MOSQUITTO_ENABLED
+#include "mosquitto.h"
+
+#define MQTT_HOST	   "localhost"
+// #define MQTT_HOST	   "137.204.213.192"
+#define MQTT_KEEPALIVE 60
+#define MQTT_PAYLOAD   "%f;%ld"
+#define MQTT_PORT	   1883
+#define MQTT_QOS	   0
+#define MQTT_RETAIN	   0
+#define MQTT_TOPIC	   "org/cineca/plugin/cntd_pub/job_id/%s/%s" ///node/%s/cpu/%u/w_rank/%u/l_rank/%u/%s"
+#endif
+
 // CNTD MPI Definitions
 #include "cntd_mpi_def.h"
 
@@ -75,7 +88,6 @@
 #define MAX_NUM_SOCKETS 				16		// Max supported sockets in a single node
 #define MAX_NUM_GPUS 					16		// Max supported gpus in a single node
 #define MAX_NUM_CPUS					1024	// Max supported CPUS in a single node
-#define TMP_DIR							"/tmp"
 
 // EAM configurations
 #define DEFAULT_TIMEOUT 				0.0005	// 500us
@@ -152,11 +164,16 @@
 #define PERF_EVENT_5 					5
 #define PERF_EVENT_6 					6
 #define PERF_EVENT_7 					7
+#ifdef CNTD_MAX_NUM_CUSTOM_PERF
+#define MAX_NUM_CUSTOM_PERF             CNTD_MAX_NUM_CUSTOM_PERF
+#else
 #define MAX_NUM_CUSTOM_PERF				8
-#define PERF_INST_RET 					8
-#define PERF_CYCLES 					9
-#define PERF_CYCLES_REF					10
-#define MAX_NUM_PERF_EVENTS				11	// Max supported perf events
+#endif
+#define PERF_INST_RET 					MAX_NUM_CUSTOM_PERF
+#define PERF_CYCLES 					(MAX_NUM_CUSTOM_PERF + 1)
+#define PERF_CYCLES_REF					(MAX_NUM_CUSTOM_PERF + 2)
+
+#define MAX_NUM_PERF_EVENTS				(MAX_NUM_CUSTOM_PERF + 3)	// Max supported perf events
 
 // The libpfm4 library can be used to translate from
 // the name in the architectural manuals to the raw hex value
@@ -164,7 +181,7 @@
 // https://github.com/wcohen/libpfm4
 
 // Typical 		attributes on a x86 platform 32bit
-// 
+//
 // event		8: Set the first 8 bit event code (required)
 // umask		8: Set the 8 bit umask. Event code and umask together select a
 // 				hardware event.
@@ -179,9 +196,15 @@
 
 // System files
 #define CPUINFO_MIN_FREQ 				"/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq"
+#ifdef USERSPACE_GOV
+#define CPUINFO_MAX_FREQ				"/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed"
+#else
 #define CPUINFO_MAX_FREQ 				"/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+#endif
+#define CUR_CPUINFO_MIN_FREQ			"/sys/devices/system/cpu/cpu%u/cpufreq/scaling_min_freq"
+#define CUR_CPUINFO_MAX_FREQ			"/sys/devices/system/cpu/cpu%u/cpufreq/scaling_max_freq"
 
-#ifdef INTEL	
+#ifdef INTEL
 
 #define INTEL_RAPL_PKG 					"/sys/devices/virtual/powercap/intel-rapl/intel-rapl:%u"
 #define INTEL_RAPL_PKG_NAME 			"/sys/devices/virtual/powercap/intel-rapl/intel-rapl:%u/name"
@@ -193,15 +216,25 @@
 #define DRAM_ENERGY_UJ 					"/sys/devices/virtual/powercap/intel-rapl/intel-rapl:%u/intel-rapl:%u:%u/energy_uj"
 #define DRAM_MAX_ENERGY_RANGE_UJ		"/sys/devices/virtual/powercap/intel-rapl/intel-rapl:%u/intel-rapl:%u:%u/max_energy_range_uj"
 
-// MSRs	
+// MSRs
 #define MSR_FILE 						"/dev/cpu/%u/msr"
 #define MSRSAFE_FILE 					"/dev/cpu/%u/msr_safe"
 
-// Intel frequency knob	
+#ifdef HWP_AVAIL
+// Intel HWP knobs
+#define IA32_PM_ENABLE                  (0x770)
+#define IA32_HWP_CAPABILITIES           (0x771)
+#define IA32_HWP_REQUEST_PKG            (0x772)
+#define IA32_HWP_INTERRUPT              (0x773)
+#define IA32_HWP_REQUEST                (0x774)
+#define IA32_HWP_PECI_REQUEST_INFO      (0x775)
+#define IA32_HWP_STATUS                 (0x777)
+#endif
+// Intel frequency knob
 #define IA32_PERF_CTL 					(0x199)
 #define MSR_TURBO_RATIO_LIMIT			(0x1AD)
 
-#elif POWER9	
+#elif POWER9
 
 #define OCC_INBAND_SENSORS 				"/sys/firmware/opal/exports/occ_inband_sensors"
 
@@ -392,6 +425,8 @@ typedef struct
 	int cpu_id;
 	int pid;
 
+	int exe_is_started;
+
 	uint64_t num_sampling;
 
 	double exe_time[2];
@@ -421,7 +456,7 @@ typedef struct
 	uint64_t util_mem[MAX_NUM_GPUS];		// Percentage - counter (sample period may be between 1 second and 1/6 second)
 
 	uint64_t temp[MAX_NUM_GPUS];			// Celsius - counter
-	uint64_t clock[MAX_NUM_GPUS];			// Clock in MHz - counter 
+	uint64_t clock[MAX_NUM_GPUS];			// Clock in MHz - counter
 
 	double energy[MAX_NUM_GPUS];			// Joules - counter
 } CNTD_GPUInfo_t;
@@ -497,7 +532,15 @@ typedef struct
 #endif
 } CNTD_t;
 
-CNTD_t *cntd;
+extern CNTD_t *cntd;
+
+extern _Bool hwp_usage;
+
+#ifdef MOSQUITTO_ENABLED
+typedef struct mosquitto MOSQUITTO_t;
+
+extern MOSQUITTO_t* mosq;
+#endif
 
 // HEADERS
 // arch.c
@@ -545,16 +588,29 @@ int get_maximum_turbo_frequency();
 int get_minimum_frequency();
 void pm_init();
 void pm_finalize();
+void write_msr(int offset, uint64_t value);
+uint64_t read_msr(int offset);
+
+// hwp.c
+void set_max_epp();
+void set_min_epp();
+void set_max_aw();
+void set_min_aw();
 
 // report.c
 void print_final_report();
 void init_timeseries_report();
+void send_mosquitto_report_general(char* topic_ending, double payload_value);
+void send_mosquitto_report(char* topic_ending,
+						   int local_rank	 ,
+						   double payload_value);
+void send_mosquitto_report_gpu(char* topic_ending, int num_gpu, double payload_value);
 void print_timeseries_report(
-	double time_curr, double time_prev, 
-	double energy_sys, 
-	double *energy_pkg, double *energy_dram, 
+	double time_curr, double time_prev,
+	double energy_sys,
+	double *energy_pkg, double *energy_dram,
 	double *energy_gpu_sys, double *energy_gpu,
-	unsigned int *util, unsigned int *util_mem, 
+	unsigned int *util, unsigned int *util_mem,
 	unsigned int *temp, unsigned int *clock);
 void finalize_timeseries_report();
 
@@ -576,6 +632,7 @@ int delete_timer(timer_t timerID);
 // tool.c
 int str_to_bool(const char str[]);
 int read_str_from_file(char *filename, char *str);
+int write_int_to_file(char* filename, int value);
 double read_time();
 uint64_t diff_overflow(uint64_t end, uint64_t start, uint64_t overflow);
 int makedir(const char dir[]);

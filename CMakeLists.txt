@@ -58,6 +58,26 @@ option(CNTD_ENABLE_DEBUG_MPI
     "Enable the debug prints on MPI functions" OFF)
 
 ###########################################################
+# MOSQUITTO Options
+###########################################################
+option(CNTD_ENABLE_MOSQUITTO
+	"Enable MQTT message passing" OFF)
+
+###########################################################
+# HWP/CPUFREQ Options
+###########################################################
+option(CNTD_HWP_AUTO_DISCOVER "Find automagically if hwp-states are available" ON)
+option(CNTD_HWP_DISCOVERED "Manual set if hwp-states are available" OFF)
+option(CNTD_USE_CPUFREQ "Manual set if use \"cpufreq\" interface" ON)
+
+###########################################################
+# PERF Options
+###########################################################
+if(DEFINED ENV{CNTD_MAX_NUM_CUSTOM_PERF})
+	add_compile_definitions(CNTD_MAX_NUM_CUSTOM_PERF=$ENV{CNTD_MAX_NUM_CUSTOM_PERF})
+endif()
+
+###########################################################
 # Build Type
 ###########################################################
 set(default_build_type "RelWithDebInfo")
@@ -70,6 +90,70 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE
         PROPERTY
             STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+###########################################################
+# DISCOVERING ARCHITECTURE
+###########################################################
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    file(READ "/proc/cpuinfo" cpu_info)
+
+    if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+        string(REGEX REPLACE ".*vendor_id[ \t]*:[ \t]+([a-zA-Z0-9_-]+).*" "\\1"
+               vendor_id "${cpu_info}")
+
+        if(vendor_id STREQUAL "GenuineIntel")
+            if(CNTD_HWP_AUTO_DISCOVER)
+                string(FIND "${cpu_info}" "hwp" match_hwp)
+
+                if(${match_hwp} EQUAL -1)
+                    set(hwp_avail FALSE)
+                else()
+                    set(hwp_avail TRUE)
+                endif()
+            else()
+                set(hwp_avail FALSE)
+                if(CNTD_HWP_DISCOVERED)
+                    set(hwp_avail TRUE)
+                endif()
+            endif()
+		else()
+			set(hwp_avail FALSE)
+        endif()
+    else()
+		set(hwp_avail FALSE)
+    endif()
+endif()
+
+if(CNTD_USE_CPUFREQ)
+    add_compile_definitions("CPUFREQ")
+    message(STATUS "Using \"cpufreq\" interface as default one")
+    message(STATUS "HWP-States will be set \"not available\" by default")
+	set(hwp_avail FALSE)
+endif()
+
+if(hwp_avail)
+   add_compile_definitions(HWP_AVAIL)
+   message(STATUS "HWP-States available")
+else()
+   message(STATUS "HWP-States not available")
+endif()
+
+###########################################################
+# DISCOVERING GOVERNOR
+###########################################################
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    file(READ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor" gov_info)
+
+	if(DEFINED ENV{CNTD_GOV})
+		set(gov_info $ENV{CNTD_GOV})
+	endif()
+
+	if(gov_info STREQUAL "userspace")
+		add_compile_definitions(USERSPACE_GOV)
+	endif()
+
+	message(STATUS "Using \"governor\" ${gov_info}")
 endif()
 
 ###########################################################
@@ -94,6 +178,30 @@ if(CNTD_ENABLE_CUDA)
     # CMake < 3.17 cannot use find_package(CUDAToolkit)
     cmake_minimum_required(VERSION 3.17)
     find_package(CUDAToolkit REQUIRED)
+endif()
+
+###########################################################
+# MOSQUITTO
+###########################################################
+if(CNTD_ENABLE_MOSQUITTO)
+	find_package(MOSQUITTO REQUIRED)
+
+	include_directories(${MOSQUITTO_INCLUDE_DIR})
+
+	link_libraries(${MOSQUITTO_LIBRARY})
+
+	add_definitions(-DMOSQUITTO_ENABLED)
+endif()
+
+###########################################################
+# Get compile  definitions
+###########################################################
+if(DEFINED ENV{CNTD_GET_COMPILE_DEFINITIONS})
+	get_directory_property(DirDefs DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_DEFINITIONS)
+	foreach(d ${DirDefs})
+		message(STATUS "Found compile definition: " ${d})
+	endforeach()
+	message(STATUS "All compile definitions: " ${DirDefs})
 endif()
 
 ###########################################################

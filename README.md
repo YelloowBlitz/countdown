@@ -1,3 +1,5 @@
+<img src="./logos/rgb-cmyk.svg" width="192" valign="middle"/>
+
 COUNTDOWN - A Run-time Library for Application-agnostic Energy Saving in MPI Communication Primitives
 ============================================
 
@@ -8,6 +10,7 @@ See copyright file
 AUTHORS
 -----------
 
+Federico Tesser <f.tesser@cineca.it> <br>
 Daniele Cesarini <d.cesarini@cineca.it> <br>
 Andrea Bartolini <a.bartolini@unibo.it> <br>
 Luca Benini <luca.benini@unibo.it> <br>

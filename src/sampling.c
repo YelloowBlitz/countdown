@@ -60,21 +60,25 @@ static void read_energy_rapl(uint64_t *energy_pkg, uint64_t *energy_dram)
 		}
 		sscanf(energy_str, "%llu\n", &energy_pkg[i]);
 
-		rv = lseek(cntd->energy_dram_fd[i], 0, SEEK_SET);
-		if(rv < 0)
-		{
-			fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to rewind the RAPL dram interface of socket %d\n", 
-				cntd->node.hostname, cntd->rank->world_rank, i);
-			PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+		if (cntd->energy_dram_fd[i] != -1) {
+			rv = lseek(cntd->energy_dram_fd[i], 0, SEEK_SET);
+			if(rv < 0)
+			{
+				fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to rewind the RAPL dram interface of socket %d\n",
+					cntd->node.hostname, cntd->rank->world_rank, i);
+				PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+			}
+			rv = read(cntd->energy_dram_fd[i], energy_str, STRING_SIZE);
+			if(rv <= 0)
+			{
+				fprintf(stdout, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to read the RAPL dram interface of socket %d\n",
+					cntd->node.hostname, cntd->rank->world_rank, i);
+				PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+			}
+			sscanf(energy_str, "%llu\n", &energy_dram[i]);
 		}
-		rv = read(cntd->energy_dram_fd[i], energy_str, STRING_SIZE);
-		if(rv <= 0)
-		{
-			fprintf(stderr, "Error: <COUNTDOWN-node:%s-rank:%d> Failed to read the RAPL dram interface of socket %d\n", 
-				cntd->node.hostname, cntd->rank->world_rank, i);
-			PMPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-		}
-		sscanf(energy_str, "%llu\n", &energy_dram[i]);
+		else
+			energy_dram[i] = 0;
 	}
 }
 #elif POWER9
@@ -314,12 +318,66 @@ HIDDEN void time_sample(int sig, siginfo_t *siginfo, void *context)
 	static double time_region[MAX_NUM_CPUS][2][2] = {0};
 	static uint64_t mpi_net[MAX_NUM_CPUS][2][2] = {0};
 	static uint64_t mpi_file[MAX_NUM_CPUS][2][2] = {0};
-	static uint64_t perf[MAX_NUM_CPUS][MAX_NUM_PERF_EVENTS][2] = {0};
+
+	typedef struct read_format {
+		uint64_t  raw_count;
+		uint64_t  time_enabled;
+		uint64_t  time_running;
+	} read_format_t;
+	// Objects with static storage duration will initialize to \"0\" if no
+	// initializer is specified.
+	static read_format_t perf[MAX_NUM_CPUS][MAX_NUM_PERF_EVENTS][2];
+
     double energy_pkg[MAX_NUM_SOCKETS] = {0};
     double energy_dram[MAX_NUM_SOCKETS] = {0};
 	double energy_gpu_sys[MAX_NUM_SOCKETS] = {0};
 	double energy_gpu[MAX_NUM_GPUS] = {0};
 	double energy_sys = 0;
+
+//#ifdef MOSQUITTO_ENABLED
+//	char topic[STRING_SIZE];
+//	char payload[STRING_SIZE];
+//	int p_length; // \"payload\" length.
+//	int rc = 0;
+//	time_t utc_secs;
+//	double exe_secs;
+//	char postfix[STRING_SIZE];
+//
+//	exe_secs = 0.0;
+//	if (cntd->rank->exe_is_started)
+//		exe_secs = read_time() - cntd->rank->exe_time[START];
+//	time(&utc_secs);
+//	get_rand_postfix(postfix,
+//					 STRING_SIZE);
+//
+//    snprintf(topic				   ,
+//             STRING_SIZE		   ,
+//             MQTT_TOPIC 		   ,
+//			 postfix			   ,
+//			 cntd->node.hostname   ,
+//			 cntd->rank->cpu_id    ,
+//			 cntd->rank->world_rank,
+//			 "exe_time");
+//    snprintf(payload	 ,
+//             STRING_SIZE ,
+//             MQTT_PAYLOAD,
+//			 exe_secs	 ,
+//			 utc_secs);
+//	p_length = strlen(payload);
+//
+//	rc = mosquitto_connect(mosq		,
+//						   MQTT_HOST,
+//						   MQTT_PORT,
+//						   MQTT_KEEPALIVE);
+//
+//	mosquitto_publish(mosq	  ,
+//					  NULL	  ,
+//					  topic	  ,
+//					  p_length,
+//					  payload ,
+//					  MQTT_QOS,
+//					  MQTT_RETAIN);
+//#endif
 
 	if(init == FALSE)
 	{
@@ -405,8 +463,6 @@ HIDDEN void time_sample(int sig, siginfo_t *siginfo, void *context)
 
 			mpi_file[i][WRITE][curr] = cntd->local_ranks[i]->mpi_file_data[WRITE][TOT];
 			mpi_file[i][READ][curr] = cntd->local_ranks[i]->mpi_file_data[READ][TOT];
-			cntd->local_ranks[i]->mpi_file_data[WRITE][CURR] = mpi_file[i][WRITE][curr] - mpi_file[i][WRITE][prev];
-			cntd->local_ranks[i]->mpi_file_data[READ][CURR] = mpi_file[i][READ][curr] - mpi_file[i][READ][prev];
 
 			// Perf events
 			if(cntd->enable_perf)
@@ -478,14 +534,37 @@ HIDDEN void time_sample(int sig, siginfo_t *siginfo, void *context)
 			cntd->local_ranks[i]->mpi_net_data[SEND][CURR] = mpi_net[i][SEND][curr] - mpi_net[i][SEND][prev];
 			cntd->local_ranks[i]->mpi_net_data[RECV][CURR] = mpi_net[i][RECV][curr] - mpi_net[i][RECV][prev];
 
-			cntd->local_ranks[i]->mpi_file_data[WRITE][CURR] = mpi_net[i][WRITE][curr] - mpi_net[i][WRITE][prev];
-			cntd->local_ranks[i]->mpi_file_data[READ][CURR] = mpi_net[i][READ][curr] - mpi_net[i][READ][prev];
+			cntd->local_ranks[i]->mpi_file_data[WRITE][CURR] = mpi_file[i][WRITE][curr] - mpi_file[i][WRITE][prev];
+			cntd->local_ranks[i]->mpi_file_data[READ][CURR] = mpi_file[i][READ][curr] - mpi_file[i][READ][prev];
 
 			if(cntd->enable_perf)
 			{
 				for(j = 0; j < MAX_NUM_PERF_EVENTS; j++)
 				{
-					cntd->local_ranks[i]->perf[j][CURR] = diff_overflow(perf[i][j][curr], perf[i][j][prev], UINT64_MAX);
+					double time_en_c = 0.0;
+					double time_run_c = 0.0;
+					double time_mul_c = 0.0;
+					double d_raw_count_c;
+					double d_total_c;
+					double time_en_p = 0.0;
+					double time_run_p = 0.0;
+					double time_mul_p = 0.0;
+					double d_raw_count_p;
+					double d_total_p;
+
+					time_en_c = (double)perf[i][j][curr].time_enabled;
+					time_run_c = (double)perf[i][j][curr].time_running;
+					time_mul_c = time_en_c/time_run_c;
+					time_en_p = (double)perf[i][j][prev].time_enabled;
+					time_run_p = (double)perf[i][j][prev].time_running;
+					time_mul_p = time_en_p/time_run_p;
+
+					d_raw_count_c = (double)perf[i][j][curr].raw_count;
+					d_total_c = d_raw_count_c * time_mul_c;
+					d_raw_count_p = (double)perf[i][j][prev].raw_count;
+					d_total_p = d_raw_count_p * time_mul_p;
+
+					cntd->local_ranks[i]->perf[j][CURR] = diff_overflow((uint64_t)d_total_c, (uint64_t)d_total_p, UINT64_MAX);
 					cntd->local_ranks[i]->perf[j][TOT] += cntd->local_ranks[i]->perf[j][CURR];
 				}
 			}
@@ -571,8 +650,10 @@ HIDDEN void event_sample_start(MPI_Type_t mpi_type)
 {
 	timing_event_sample[START] = read_time();
 
-	if(mpi_type == __MPI_INIT || mpi_type == __MPI_INIT_THREAD)
+	if(mpi_type == __MPI_INIT || mpi_type == __MPI_INIT_THREAD) {
 		cntd->rank->exe_time[START] = timing_event_sample[START];
+		cntd->rank->exe_is_started = 1;
+	}
 	else
 		cntd->rank->app_time[TOT] += timing_event_sample[START] - timing_event_sample[END];
 }
